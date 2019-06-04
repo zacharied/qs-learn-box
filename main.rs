@@ -386,6 +386,19 @@ impl GameState {
 /// check if this returned a `Err(Error::QuicksilverError)` or an `Ok()`. If it did, then the
 /// function continues as normal. Otherwise it will panic with the error's message.
 impl GameState {
+    fn call_wrapper(&mut self, window: &mut Window,
+                    mut wrapper: Box<dyn FnMut(&mut GameState, &mut Window) -> Result<()>>)
+        -> quicksilver::Result<()>
+    {
+        wrapper(self, window)
+            .or_else(|e| {
+                match e {
+                    Error::QuicksilverError(e) => return Err(e),
+                    _ => panic!(e.to_string()),
+                }
+            })
+    }
+
     fn draw_wrapper(&mut self, window: &mut Window) -> Result<()> {
         window.clear(Color::BLACK)?;
 
@@ -478,23 +491,13 @@ impl State for GameState {
     }
 
     fn update(&mut self, window: &mut Window) -> quicksilver::Result<()> {
-        let res = self.update_wrapper(window);
-        res.or_else(|e| {
-            match e {
-                Error::QuicksilverError(e) => return Err(e),
-                _ => panic!(e.to_string()),
-            }
-        })
+        let func = |gs: &mut GameState, win: &mut Window| { gs.update_wrapper(win) };
+        self.call_wrapper(window, Box::new(func))
     }
 
     fn draw(&mut self, window: &mut Window) -> quicksilver::Result<()> {
-        let res = self.draw_wrapper(window);
-        res.or_else(|e| {
-            match e {
-                Error::QuicksilverError(e) => return Err(e),
-                _ => panic!(e.to_string()),
-            }
-        })
+        let func = |gs: &mut GameState, win: &mut Window| { gs.draw_wrapper(win) };
+        self.call_wrapper(window, Box::new(func))
     }
 }
 
