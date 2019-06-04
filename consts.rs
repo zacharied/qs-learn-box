@@ -16,7 +16,8 @@ pub mod game {
 pub mod system {
     pub const WIN_WIDTH: u32 = 800;
     pub const WIN_HEIGHT: u32 = 600;
-    pub const RECENT_FPS_SAMPLE_SIZE: usize = 64;
+    pub const FPS_GRAPH_SAMPLE_COUNT: usize = 64;
+
 }
 
 pub mod graphics {

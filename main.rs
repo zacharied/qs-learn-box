@@ -2,6 +2,7 @@ extern crate quicksilver;
 extern crate rand;
 
 mod consts;
+mod util;
 
 use quicksilver::{
     geom::{Rectangle, Shape, Vector},
@@ -18,6 +19,7 @@ use std::{
 };
 
 use consts::{game::*, graphics::*, system::*};
+use util::FpsGraph;
 
 #[derive(Debug)]
 enum Direction {
@@ -207,8 +209,7 @@ struct GameState {
 
     is_running: bool,
 
-    fps_sum: [f64; RECENT_FPS_SAMPLE_SIZE],
-    fps_sum_i: usize,
+    fps_graph: FpsGraph,
     fps_update_time: Option<Instant>,
 
     font: Asset<Font>,
@@ -261,16 +262,6 @@ impl GameState {
         Ok(())
     }
 
-    fn recent_average_fps(&self) -> Option<f64> {
-        let mut sum = 0.0;
-        for f in self.fps_sum.iter() {
-            if !f.is_normal() {
-                return None;
-            }
-            sum += *f;
-        }
-        Some(sum / self.fps_sum.len() as f64)
-    }
 }
 
 // Drawing logic.
@@ -349,7 +340,7 @@ impl GameState {
 
     fn draw_hud(&mut self, window: &mut Window) -> Result<()> {
         let style = &self.font_style;
-        if let Some(fps) = &self.recent_average_fps().as_mut() {
+        if let Some(fps) = &self.fps_graph.recent_average_fps() {
             self.font.execute(|font| {
                 let img = font.render(&format!("{:.0}", fps), style)?;
                 window.draw(
@@ -413,8 +404,7 @@ impl GameState {
 
         self.handle_input(window.keyboard())?;
 
-        self.fps_sum[self.fps_sum_i % self.fps_sum.len()] = window.current_fps();
-        self.fps_sum_i += 1;
+        self.fps_graph.log_fps(window.current_fps());
         if self.fps_update_time.is_none()
             || Instant::now().duration_since(self.fps_update_time.unwrap())
                 > Duration::from_millis(200)
@@ -476,8 +466,7 @@ impl State for GameState {
 
             is_running: true,
 
-            fps_sum: [0.0; RECENT_FPS_SAMPLE_SIZE],
-            fps_sum_i: 0,
+            fps_graph: FpsGraph::new(),
             fps_update_time: None,
 
             last_spawned: None,
@@ -490,26 +479,22 @@ impl State for GameState {
 
     fn update(&mut self, window: &mut Window) -> quicksilver::Result<()> {
         let res = self.update_wrapper(window);
-        if res.is_ok() {
-            return Ok(());
-        }
-        let res = res.unwrap_err();
-        match res {
-            Error::QuicksilverError(err) => Err(err),
-            _ => panic!(res.to_string()),
-        }
+        res.or_else(|e| {
+            match e {
+                Error::QuicksilverError(e) => return Err(e),
+                _ => panic!(e.to_string()),
+            }
+        })
     }
 
     fn draw(&mut self, window: &mut Window) -> quicksilver::Result<()> {
         let res = self.draw_wrapper(window);
-        if res.is_ok() {
-            return Ok(());
-        }
-        let res = res.unwrap_err();
-        match res {
-            Error::QuicksilverError(err) => Err(err),
-            _ => panic!(res.to_string()),
-        }
+        res.or_else(|e| {
+            match e {
+                Error::QuicksilverError(e) => return Err(e),
+                _ => panic!(e.to_string()),
+            }
+        })
     }
 }
 
