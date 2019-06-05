@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 use super::consts::system::*;
 
 pub struct FpsGraph {
@@ -27,5 +29,27 @@ impl FpsGraph {
             sum += *f;
         }
         Some(sum / self.history.len() as f64)
+    }
+}
+
+pub struct Countdown {
+    start: Instant,
+    duration: Duration
+}
+
+impl Countdown {
+    pub fn new(duration: Duration) -> Self {
+        Self {
+            start: Instant::now(),
+            duration
+        }
+    }
+
+    pub fn elapsed(&self) -> Duration {
+        self.start.elapsed()
+    }
+
+    pub fn is_done(&self) -> bool {
+        self.start.elapsed() > self.duration
     }
 }

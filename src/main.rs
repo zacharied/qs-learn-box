@@ -20,7 +20,7 @@ use std::{
 
 use consts::{game::*, graphics::*, system::*};
 use error::{Error, Result};
-use util::FpsGraph;
+use util::{Countdown, FpsGraph};
 
 #[derive(Debug)]
 enum Direction {
@@ -152,6 +152,7 @@ impl Obstacle {
 struct Player {
     rect: Rectangle,
     score: u32,
+    color: Color,
 }
 
 impl Player {
@@ -159,6 +160,7 @@ impl Player {
         Player {
             rect: Rectangle::new((0, 0), (50, 50)),
             score: 0,
+            color: Color::RED,
         }
     }
 
@@ -177,7 +179,7 @@ struct GameState {
     spawn_interval: Duration,
 
     is_running: bool,
-    is_resetting: bool,
+    reset_countdown: Option<Countdown>,
 
     fps_graph: FpsGraph,
     fps_update_time: Option<Instant>,
@@ -208,14 +210,16 @@ impl GameState {
         };
 
         // Check movement.
-        if keyboard[Key::H].is_down() || keyboard[Key::Left].is_down() {
-            self.player.rect.pos.x -= movespeed;
-        } else if keyboard[Key::J].is_down() || keyboard[Key::Down].is_down() {
-            self.player.rect.pos.y += movespeed;
-        } else if keyboard[Key::K].is_down() || keyboard[Key::Up].is_down() {
-            self.player.rect.pos.y -= movespeed;
-        } else if keyboard[Key::L].is_down() || keyboard[Key::Right].is_down() {
-            self.player.rect.pos.x += movespeed;
+        if self.reset_countdown.is_none() {
+            if keyboard[Key::H].is_down() || keyboard[Key::Left].is_down() {
+                self.player.rect.pos.x -= movespeed;
+            } else if keyboard[Key::J].is_down() || keyboard[Key::Down].is_down() {
+                self.player.rect.pos.y += movespeed;
+            } else if keyboard[Key::K].is_down() || keyboard[Key::Up].is_down() {
+                self.player.rect.pos.y -= movespeed;
+            } else if keyboard[Key::L].is_down() || keyboard[Key::Right].is_down() {
+                self.player.rect.pos.x += movespeed;
+            }
         }
 
         // Put player back in movement bounds.
@@ -349,8 +353,15 @@ impl GameState {
         );
         window.draw(
             &self.player.rect.on_playfield(),
-            Background::Col(Color::RED),
+            Background::Col(self.player.color),
         );
+
+        if let Some(c) = &self.reset_countdown {
+            let d = c.elapsed();
+            let v = u8::max_value() as f64 * (((d.as_secs() as f64 + d.subsec_millis() as f64 / 500.) * (std::f64::consts::PI * 2.)).cos() * 0.5 + 0.5);
+            let v = u8::max_value() - v as u8;
+            self.player.color = Color::from_rgba(u8::max_value(), v, v, std::f32::MAX);
+        }
 
         Ok(())
     }
@@ -400,37 +411,39 @@ impl GameState {
             self.fps_update_time = Some(Instant::now());
         }
 
-        for ob in &mut self.obstacles {
-            ob.lifetime += 1.;
+        if self.reset_countdown.is_none() {
+            for ob in &mut self.obstacles {
+                ob.lifetime += 1.;
 
-            // Check collisions.
-            if self.player.rect.overlaps_rectangle(&ob.rectangle()) {
-                self.is_resetting = true;
-            } else if self
-                .player
-                .collector_rectangle()
-                .overlaps_rectangle(&ob.rectangle())
-            {
-                self.player.score += 1;
+                // Check collisions.
+                if self.player.rect.overlaps_rectangle(&ob.rectangle()) {
+                    self.reset_countdown = Some(Countdown::new(Duration::from_secs(2)));
+                } else if self
+                    .player
+                    .collector_rectangle()
+                    .overlaps_rectangle(&ob.rectangle())
+                {
+                    self.player.score += 1;
+                }
             }
         }
 
         // Spawn a new obstacle if it's time.
-        let now = Instant::now();
-        if self.last_spawned.is_none()
-            || now.duration_since(self.last_spawned.unwrap()) > self.spawn_interval
+        if self.last_spawned.is_none() || self.last_spawned.unwrap().elapsed() > self.spawn_interval
         {
-            self.last_spawned = Some(now);
+            self.last_spawned = Some(Instant::now());
             self.obstacles.push(Obstacle::spawn(&mut self.rng));
             self.spawn_interval = Self::obstacle_spawn_interval(self.player.score);
         }
 
 
-        if self.is_resetting {
-            self.obstacles.clear();
-            self.player = Player::new();
-
-            self.is_resetting = false;
+        if let Some(c) = &self.reset_countdown {
+            if c.is_done() {
+                println!("You lose! Score: {}", self.player.score);
+                self.obstacles.clear();
+                self.player = Player::new();
+                self.reset_countdown = None;
+            }
         }
 
         // Give the player points and destroy an obstacle if it's offscreen.
@@ -458,7 +471,7 @@ impl State for GameState {
             rng: rand::thread_rng(),
 
             is_running: true,
-            is_resetting: false,
+            reset_countdown: None,
 
             fps_graph: FpsGraph::new(),
             fps_update_time: None,
