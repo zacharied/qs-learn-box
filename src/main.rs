@@ -355,7 +355,7 @@ impl GameState {
 /// check if this returned a `Err(Error::QuicksilverError)` or an `Ok()`. If it did, then the
 /// function continues as normal. Otherwise it will panic with the error's message.
 impl GameState {
-    fn call_wrapper(&mut self, window: &mut Window,
+    fn wrapper(&mut self, window: &mut Window,
                     mut wrapper: Box<dyn FnMut(&mut GameState, &mut Window) -> Result<()>>)
         -> quicksilver::Result<()>
     {
@@ -460,13 +460,13 @@ impl State for GameState {
     }
 
     fn update(&mut self, window: &mut Window) -> quicksilver::Result<()> {
-        let func = |gs: &mut GameState, win: &mut Window| { gs.update_wrapper(win) };
-        self.call_wrapper(window, Box::new(func))
+        let func = Box::new(|gs: &mut GameState, win: &mut Window| { gs.update_wrapper(win) });
+        self.wrapper(window, func)
     }
 
     fn draw(&mut self, window: &mut Window) -> quicksilver::Result<()> {
-        let func = |gs: &mut GameState, win: &mut Window| { gs.draw_wrapper(win) };
-        self.call_wrapper(window, Box::new(func))
+        let func = Box::new(|gs: &mut GameState, win: &mut Window| { gs.draw_wrapper(win) });
+        self.wrapper(window, func)
     }
 }
 
