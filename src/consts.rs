@@ -1,5 +1,6 @@
 pub mod game {
     pub const PLAYER_SPEED: f32 = 5.0;
+    pub const PLAYER_SLOWMO_FACTOR: f32 = 2.2;
     pub const COLLECTOR_EDGE_LENGTH: f32 = 80.0;
     pub const FIELD_EDGE_LENGTH: f32 = 500.0;
     const OBSTACLE_WARNING_DRAW_TIME: u32 = 20;
@@ -23,6 +24,9 @@ pub mod system {
 pub mod graphics {
     pub const FONT_NAME: &str = "Georgia.ttf";
     pub const FONT_SIZE_PT: f32 = 18.0;
+
+    pub const HUD_CORNER_PADDING: f32 = 15.0;
+
     pub const FIELD_EDGE_BORDER_WIDTH: f32 = 1.0;
     pub const OBSTACLE_WARNING_WIDTH: f32 = 1.0;
 }

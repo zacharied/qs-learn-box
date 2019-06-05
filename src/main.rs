@@ -177,6 +177,7 @@ struct GameState {
     spawn_interval: Duration,
 
     is_running: bool,
+    is_resetting: bool,
 
     fps_graph: FpsGraph,
     fps_update_time: Option<Instant>,
@@ -200,15 +201,21 @@ impl GameState {
 // Window logic
 impl GameState {
     fn handle_input(&mut self, keyboard: &Keyboard) -> quicksilver::Result<()> {
+        let movespeed = if keyboard[Key::LShift].is_down() {
+            PLAYER_SPEED / PLAYER_SLOWMO_FACTOR
+        } else {
+            PLAYER_SPEED
+        };
+
         // Check movement.
-        if keyboard[Key::H].is_down() {
-            self.player.rect.pos.x -= PLAYER_SPEED;
-        } else if keyboard[Key::J].is_down() {
-            self.player.rect.pos.y += PLAYER_SPEED;
-        } else if keyboard[Key::K].is_down() {
-            self.player.rect.pos.y -= PLAYER_SPEED;
-        } else if keyboard[Key::L].is_down() {
-            self.player.rect.pos.x += PLAYER_SPEED;
+        if keyboard[Key::H].is_down() || keyboard[Key::Left].is_down() {
+            self.player.rect.pos.x -= movespeed;
+        } else if keyboard[Key::J].is_down() || keyboard[Key::Down].is_down() {
+            self.player.rect.pos.y += movespeed;
+        } else if keyboard[Key::K].is_down() || keyboard[Key::Up].is_down() {
+            self.player.rect.pos.y -= movespeed;
+        } else if keyboard[Key::L].is_down() || keyboard[Key::Right].is_down() {
+            self.player.rect.pos.x += movespeed;
         }
 
         // Put player back in movement bounds.
@@ -230,7 +237,6 @@ impl GameState {
 
         Ok(())
     }
-
 }
 
 // Drawing logic.
@@ -313,7 +319,7 @@ impl GameState {
             self.font.execute(|font| {
                 let img = font.render(&format!("{:.0}", fps), style)?;
                 window.draw(
-                    &Rectangle::new((0, 0), img.area().size()),
+                    &Rectangle::new((HUD_CORNER_PADDING, HUD_CORNER_PADDING), img.area().size()),
                     Background::Img(&img),
                 );
                 Ok(())
@@ -325,7 +331,7 @@ impl GameState {
             let img = font.render(&format!("{:09}", score), style)?;
             window.draw(
                 &Rectangle::new(
-                    (WIN_WIDTH as f32 - img.area().width(), 0),
+                    (WIN_WIDTH as f32 - img.area().width() - HUD_CORNER_PADDING, HUD_CORNER_PADDING),
                     img.area().size(),
                 ),
                 Background::Img(&img),
@@ -399,10 +405,7 @@ impl GameState {
 
             // Check collisions.
             if self.player.rect.overlaps_rectangle(&ob.rectangle()) {
-                if self.is_running {
-                    self.is_running = false;
-                    println!("You lose! Score: {}", self.player.score);
-                }
+                self.is_resetting = true;
             } else if self
                 .player
                 .collector_rectangle()
@@ -410,6 +413,24 @@ impl GameState {
             {
                 self.player.score += 1;
             }
+        }
+
+        // Spawn a new obstacle if it's time.
+        let now = Instant::now();
+        if self.last_spawned.is_none()
+            || now.duration_since(self.last_spawned.unwrap()) > self.spawn_interval
+        {
+            self.last_spawned = Some(now);
+            self.obstacles.push(Obstacle::spawn(&mut self.rng));
+            self.spawn_interval = Self::obstacle_spawn_interval(self.player.score);
+        }
+
+
+        if self.is_resetting {
+            self.obstacles.clear();
+            self.player = Player::new();
+
+            self.is_resetting = false;
         }
 
         // Give the player points and destroy an obstacle if it's offscreen.
@@ -425,16 +446,6 @@ impl GameState {
             res
         });
 
-        // Spawn a new obstacle if it's time.
-        let now = Instant::now();
-        if self.last_spawned.is_none()
-            || now.duration_since(self.last_spawned.unwrap()) > self.spawn_interval
-        {
-            self.last_spawned = Some(now);
-            self.obstacles.push(Obstacle::spawn(&mut self.rng));
-            self.spawn_interval = Self::obstacle_spawn_interval(self.player.score);
-        }
-
         Ok(())
     }
 }
@@ -447,6 +458,7 @@ impl State for GameState {
             rng: rand::thread_rng(),
 
             is_running: true,
+            is_resetting: false,
 
             fps_graph: FpsGraph::new(),
             fps_update_time: None,
@@ -460,13 +472,15 @@ impl State for GameState {
     }
 
     fn update(&mut self, window: &mut Window) -> quicksilver::Result<()> {
-        let func = Box::new(|gs: &mut GameState, win: &mut Window| { gs.update_wrapper(win) });
-        self.wrapper(window, func)
+        self.wrapper(window, Box::new(|gs: &mut GameState, win: &mut Window| {
+            gs.update_wrapper(win)
+        }))
     }
 
     fn draw(&mut self, window: &mut Window) -> quicksilver::Result<()> {
-        let func = Box::new(|gs: &mut GameState, win: &mut Window| { gs.draw_wrapper(win) });
-        self.wrapper(window, func)
+        self.wrapper(window, Box::new(|gs: &mut GameState, win: &mut Window| {
+            gs.draw_wrapper(win)
+        }))
     }
 }
 
