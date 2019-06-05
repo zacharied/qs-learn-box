@@ -2,6 +2,7 @@ extern crate quicksilver;
 extern crate rand;
 
 mod consts;
+mod error;
 mod util;
 
 use quicksilver::{
@@ -14,11 +15,11 @@ use quicksilver::{
 use rand::{rngs::ThreadRng, Rng};
 
 use std::{
-    cmp, fmt, result,
-    time::{Duration, Instant},
+    cmp, time::{Duration, Instant},
 };
 
 use consts::{game::*, graphics::*, system::*};
+use error::{Error, Result};
 use util::FpsGraph;
 
 #[derive(Debug)]
@@ -28,39 +29,6 @@ enum Direction {
     South,
     West,
 }
-
-#[derive(Debug)]
-enum Error {
-    ObstacleRixelOutOfBounds(f32),
-    QuicksilverError(quicksilver::Error),
-}
-
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Error::ObstacleRixelOutOfBounds(pos) => {
-                write!(f, "Obstacle position {} is out of bonds", pos)
-            }
-            Error::QuicksilverError(err) => err.fmt(f),
-        }
-    }
-}
-
-impl From<quicksilver::Error> for Error {
-    fn from(e: quicksilver::Error) -> Self {
-        Error::QuicksilverError(e)
-    }
-}
-
-type Result<T> = result::Result<T, Error>;
-
-// TODO Rixel type
 
 #[derive(Debug, Clone, Copy)]
 struct Obstacle {
