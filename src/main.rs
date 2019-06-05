@@ -46,7 +46,7 @@ impl Obstacle {
     fn spawn(rng: &mut ThreadRng) -> Obstacle {
         let width = rng.gen_range(6.0, 14.0);
         let rixel = FIELD_EDGE_LENGTH * rng.gen_range(0, 4) as f32;
-        let rixel = rixel + rng.gen_range(width / 2.0, FIELD_EDGE_LENGTH - width / 2.0);
+        let rixel = rixel + rng.gen_range(width / 2., FIELD_EDGE_LENGTH - width / 2.);
         Obstacle {
             rixel: rixel,
             speed: 3.0,
@@ -63,13 +63,13 @@ impl Obstacle {
 
     /// Convert a numerical position (in rixels) to a side of the screen.
     fn rixel_to_direction(rixel: f32) -> Result<Direction> {
-        if rixel > 0.0 && rixel < FIELD_EDGE_LENGTH {
+        if rixel > 0. && rixel < FIELD_EDGE_LENGTH {
             Ok(Direction::North)
-        } else if rixel < FIELD_EDGE_LENGTH * 2.0 {
+        } else if rixel < FIELD_EDGE_LENGTH * 2. {
             Ok(Direction::East)
-        } else if rixel < FIELD_EDGE_LENGTH * 3.0 {
+        } else if rixel < FIELD_EDGE_LENGTH * 3. {
             Ok(Direction::South)
-        } else if rixel < FIELD_EDGE_LENGTH * 4.0 {
+        } else if rixel < FIELD_EDGE_LENGTH * 4. {
             Ok(Direction::West)
         } else {
             Err(Error::ObstacleRixelOutOfBounds(rixel))
@@ -91,18 +91,18 @@ impl Obstacle {
         Ok(Rectangle::new(
             // Position
             match dir {
-                North => (rixel - width / 2.0, -length + distance),
+                North => (rixel - width / 2., -length + distance),
                 East => (
                     FIELD_EDGE_LENGTH - distance,
-                    rixel - FIELD_EDGE_LENGTH - width / 2.0,
+                    rixel - FIELD_EDGE_LENGTH - width / 2.,
                 ),
                 South => (
-                    rixel - distance_back * 2.0 - FIELD_EDGE_LENGTH - width / 2.0,
+                    rixel - distance_back * 2. - FIELD_EDGE_LENGTH - width / 2.,
                     FIELD_EDGE_LENGTH - distance,
                 ),
                 West => (
                     -length + distance,
-                    FIELD_EDGE_LENGTH * 4.0 - rixel - width / 2.0,
+                    FIELD_EDGE_LENGTH * 4. - rixel - width / 2.,
                 ),
             },
             // Dimensions
@@ -138,7 +138,7 @@ impl Obstacle {
     fn opposite(&self) -> f32 {
         let to_next_corner = FIELD_EDGE_LENGTH - (self.rixel % FIELD_EDGE_LENGTH);
         (self.rixel + to_next_corner + FIELD_EDGE_LENGTH + to_next_corner)
-            % (FIELD_EDGE_LENGTH * 4.0)
+            % (FIELD_EDGE_LENGTH * 4.)
     }
 
     /// The lifetime value at which this obstacle has moved completely offscreen.
@@ -214,13 +214,13 @@ impl GameState {
         // Put player back in movement bounds.
         if self.player.rect.pos.x + self.player.rect.size.x > FIELD_EDGE_LENGTH {
             self.player.rect.pos.x = FIELD_EDGE_LENGTH - self.player.rect.size.x;
-        } else if self.player.rect.pos.x < 0.0 {
-            self.player.rect.pos.x = 0.0;
+        } else if self.player.rect.pos.x < 0. {
+            self.player.rect.pos.x = 0.;
         }
         if self.player.rect.pos.y + self.player.rect.size.y > FIELD_EDGE_LENGTH {
             self.player.rect.pos.y = FIELD_EDGE_LENGTH - self.player.rect.size.y;
-        } else if self.player.rect.pos.y < 0.0 {
-            self.player.rect.pos.y = 0.0;
+        } else if self.player.rect.pos.y < 0. {
+            self.player.rect.pos.y = 0.;
         }
 
         // Quit and shit.
@@ -239,7 +239,7 @@ impl GameState {
         // Draw the obstacle warnings.
         for obstacle in &self.obstacles {
             // Didn't realize Quicksilver had a Line type lol.
-            let line_rect = if obstacle.lifetime < 0.0 {
+            let line_rect = if obstacle.lifetime < 0. {
                 let dist = FIELD_EDGE_LENGTH.min(
                     OBSTACLE_WARNING_MOVE_SPEED
                         * (obstacle.lifetime + OBSTACLE_PRE_SPAWN_WARN_TIME as f32),
@@ -263,7 +263,7 @@ impl GameState {
                         - OBSTACLE_HIDE_DELAY as f32
                         - obstacle.total_lifetime())
                         * OBSTACLE_WARNING_MOVE_SPEED)
-                        .max(0.0);
+                        .max(0.);
                 Obstacle::positioning_to_rectangle(
                     obstacle.opposite(),
                     dist,
@@ -291,8 +291,8 @@ impl GameState {
             &Rectangle::new(
                 (-FIELD_EDGE_BORDER_WIDTH, -FIELD_EDGE_BORDER_WIDTH),
                 (
-                    FIELD_EDGE_BORDER_WIDTH * 2.0 + FIELD_EDGE_LENGTH,
-                    FIELD_EDGE_BORDER_WIDTH * 2.0 + FIELD_EDGE_LENGTH,
+                    FIELD_EDGE_BORDER_WIDTH * 2. + FIELD_EDGE_LENGTH,
+                    FIELD_EDGE_BORDER_WIDTH * 2. + FIELD_EDGE_LENGTH,
                 ),
             )
             .on_playfield(),
@@ -395,7 +395,7 @@ impl GameState {
         }
 
         for ob in &mut self.obstacles {
-            ob.lifetime += 1.0;
+            ob.lifetime += 1.;
 
             // Check collisions.
             if self.player.rect.overlaps_rectangle(&ob.rectangle()) {
@@ -479,8 +479,8 @@ impl ToPlayfieldCoordinates for Rectangle {
     fn on_playfield(&self) -> Rectangle {
         // This assumes the field is going in the center of the screen.
         self.translate((
-            (WIN_WIDTH as f32 - FIELD_EDGE_LENGTH) / 2.0,
-            (WIN_HEIGHT as f32 - FIELD_EDGE_LENGTH) / 2.0,
+            (WIN_WIDTH as f32 - FIELD_EDGE_LENGTH) / 2.,
+            (WIN_HEIGHT as f32 - FIELD_EDGE_LENGTH) / 2.,
         ))
     }
 }
