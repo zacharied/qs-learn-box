@@ -11,4 +11,4 @@ splines = "0.2.0"
 
 [[bin]]
 name = "learn-quicksilver"
-path = "main.rs"
+path = "src/main.rs"

@@ -180,6 +180,7 @@ impl Obstacle {
 }
 
 /// Tracks information about the player and their avatar.
+#[derive(Debug)]
 struct Player {
     rect: Rectangle,
     score: u32,
