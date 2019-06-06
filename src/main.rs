@@ -488,13 +488,13 @@ impl State for GameState {
     }
 
     fn draw(&mut self, window: &mut Window) -> quicksilver::Result<()> {
-        fn draw_inner(gs: &mut GameState, window: &mut Window) -> Result<()> {
+        fn draw_inner(state: &mut GameState, window: &mut Window) -> Result<()> {
             window.clear(Color::BLACK)?;
 
-            gs.draw_field_border(window)?;
-            gs.draw_player(window)?;
-            gs.draw_obstacles(window)?;
-            gs.draw_hud(window)?;
+            state.draw_field_border(window)?;
+            state.draw_player(window)?;
+            state.draw_obstacles(window)?;
+            state.draw_hud(window)?;
 
             Ok(())
         }
