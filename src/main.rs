@@ -200,9 +200,9 @@ impl GameState {
     }
 }
 
-// Window logic
+// Drawing logic.
 impl GameState {
-    fn handle_input(&mut self, keyboard: &Keyboard) -> quicksilver::Result<()> {
+    fn update_handle_input(&mut self, keyboard: &Keyboard) -> quicksilver::Result<()> {
         let movespeed = if keyboard[Key::LShift].is_down() {
             PLAYER_SPEED / PLAYER_SLOWMO_FACTOR
         } else {
@@ -241,10 +241,7 @@ impl GameState {
 
         Ok(())
     }
-}
 
-// Drawing logic.
-impl GameState {
     fn draw_obstacles(&self, window: &mut Window) -> Result<()> {
         // Draw the obstacle warnings.
         for obstacle in &self.obstacles {
@@ -367,6 +364,83 @@ impl GameState {
     }
 }
 
+// Update logic
+impl GameState {
+    fn update_fps_graph(&mut self, window: &Window) -> Result<()> {
+        self.fps_graph.log_fps(window.current_fps());
+        if self.fps_update_time.is_none()
+            || Instant::now().duration_since(self.fps_update_time.unwrap())
+            > Duration::from_millis(200)
+        {
+            self.fps_update_time = Some(Instant::now());
+        }
+
+        Ok(())
+    }
+
+    fn update_check_collisions(&mut self) -> Result<()> {
+        if self.reset_countdown.is_none() {
+            for ob in &mut self.obstacles {
+                ob.lifetime += 1.;
+
+                // Check collisions.
+                if self.player.rect.overlaps_rectangle(&ob.rectangle()) {
+                    self.reset_countdown = Some(Countdown::new(Duration::from_secs(2)));
+                } else if self
+                    .player
+                    .collector_rectangle()
+                    .overlaps_rectangle(&ob.rectangle())
+                {
+                    self.player.score += 1;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn update_spawn_obstacles(&mut self) -> Result<()> {
+        if self.last_spawned.is_none() || self.last_spawned.unwrap().elapsed() > self.spawn_interval
+        {
+            self.last_spawned = Some(Instant::now());
+            self.obstacles.push(Obstacle::spawn(&mut self.rng));
+            self.spawn_interval = GameState::obstacle_spawn_interval(self.player.score);
+        }
+
+        Ok(())
+    }
+
+    fn update_reset_game(&mut self) -> Result<()> {
+        if let Some(c) = &self.reset_countdown {
+            if c.is_done() {
+                println!("You lose! Score: {}", self.player.score);
+                self.obstacles.clear();
+                self.player = Player::new();
+                self.reset_countdown = None;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn update_despawn_obstacles(&mut self) -> Result<()> {
+        // Give the player points and destroy an obstacle if it's offscreen.
+        let player = &mut self.player;
+        self.obstacles.retain(|&ob| {
+            let res = ob.lifetime
+                < ob.total_lifetime()
+                + FIELD_EDGE_LENGTH / OBSTACLE_WARNING_MOVE_SPEED
+                + OBSTACLE_HIDE_DELAY as f32;
+            if !res {
+                player.score += 100;
+            }
+            res
+        });
+
+        Ok(())
+    }
+}
+
 impl State for GameState {
     fn new() -> quicksilver::Result<GameState> {
         Ok(GameState {
@@ -394,63 +468,12 @@ impl State for GameState {
                 window.close();
             }
 
-            state.handle_input(window.keyboard())?;
-
-            state.fps_graph.log_fps(window.current_fps());
-            if state.fps_update_time.is_none()
-                || Instant::now().duration_since(state.fps_update_time.unwrap())
-                > Duration::from_millis(200)
-            {
-                state.fps_update_time = Some(Instant::now());
-            }
-
-            if state.reset_countdown.is_none() {
-                for ob in &mut state.obstacles {
-                    ob.lifetime += 1.;
-
-                    // Check collisions.
-                    if state.player.rect.overlaps_rectangle(&ob.rectangle()) {
-                        state.reset_countdown = Some(Countdown::new(Duration::from_secs(2)));
-                    } else if state
-                        .player
-                        .collector_rectangle()
-                        .overlaps_rectangle(&ob.rectangle())
-                    {
-                        state.player.score += 1;
-                    }
-                }
-            }
-
-            // Spawn a new obstacle if it's time.
-            if state.last_spawned.is_none() || state.last_spawned.unwrap().elapsed() > state.spawn_interval
-            {
-                state.last_spawned = Some(Instant::now());
-                state.obstacles.push(Obstacle::spawn(&mut state.rng));
-                state.spawn_interval = GameState::obstacle_spawn_interval(state.player.score);
-            }
-
-
-            if let Some(c) = &state.reset_countdown {
-                if c.is_done() {
-                    println!("You lose! Score: {}", state.player.score);
-                    state.obstacles.clear();
-                    state.player = Player::new();
-                    state.reset_countdown = None;
-                }
-            }
-
-            // Give the player points and destroy an obstacle if it's offscreen.
-            let player = &mut state.player;
-            state.obstacles.retain(|&ob| {
-                let res = ob.lifetime
-                    < ob.total_lifetime()
-                    + FIELD_EDGE_LENGTH / OBSTACLE_WARNING_MOVE_SPEED
-                    + OBSTACLE_HIDE_DELAY as f32;
-                if !res {
-                    player.score += 100;
-                }
-                res
-            });
+            state.update_handle_input(window.keyboard())?;
+            state.update_fps_graph(window)?;
+            state.update_check_collisions()?;
+            state.update_spawn_obstacles()?;
+            state.update_despawn_obstacles()?;
+            state.update_reset_game()?;
 
             Ok(())
         }
