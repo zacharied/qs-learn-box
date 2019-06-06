@@ -3,6 +3,7 @@ extern crate rand;
 
 mod consts;
 mod error;
+mod graphics;
 mod util;
 
 use quicksilver::{
@@ -202,46 +203,6 @@ impl GameState {
 
 // Drawing logic.
 impl GameState {
-    fn update_handle_input(&mut self, keyboard: &Keyboard) -> quicksilver::Result<()> {
-        let movespeed = if keyboard[Key::LShift].is_down() {
-            PLAYER_SPEED / PLAYER_SLOWMO_FACTOR
-        } else {
-            PLAYER_SPEED
-        };
-
-        // Check movement.
-        if self.reset_countdown.is_none() {
-            if keyboard[Key::H].is_down() || keyboard[Key::Left].is_down() {
-                self.player.rect.pos.x -= movespeed;
-            } else if keyboard[Key::J].is_down() || keyboard[Key::Down].is_down() {
-                self.player.rect.pos.y += movespeed;
-            } else if keyboard[Key::K].is_down() || keyboard[Key::Up].is_down() {
-                self.player.rect.pos.y -= movespeed;
-            } else if keyboard[Key::L].is_down() || keyboard[Key::Right].is_down() {
-                self.player.rect.pos.x += movespeed;
-            }
-        }
-
-        // Put player back in movement bounds.
-        if self.player.rect.pos.x + self.player.rect.size.x > FIELD_EDGE_LENGTH {
-            self.player.rect.pos.x = FIELD_EDGE_LENGTH - self.player.rect.size.x;
-        } else if self.player.rect.pos.x < 0. {
-            self.player.rect.pos.x = 0.;
-        }
-        if self.player.rect.pos.y + self.player.rect.size.y > FIELD_EDGE_LENGTH {
-            self.player.rect.pos.y = FIELD_EDGE_LENGTH - self.player.rect.size.y;
-        } else if self.player.rect.pos.y < 0. {
-            self.player.rect.pos.y = 0.;
-        }
-
-        // Quit and shit.
-        if keyboard[Key::Escape].is_down() {
-            self.is_running = false;
-        }
-
-        Ok(())
-    }
-
     fn draw_obstacles(&self, window: &mut Window) -> Result<()> {
         // Draw the obstacle warnings.
         for obstacle in &self.obstacles {
@@ -366,6 +327,46 @@ impl GameState {
 
 // Update logic
 impl GameState {
+    fn update_handle_input(&mut self, keyboard: &Keyboard) -> quicksilver::Result<()> {
+        let movespeed = if keyboard[Key::LShift].is_down() {
+            PLAYER_SPEED / PLAYER_SLOWMO_FACTOR
+        } else {
+            PLAYER_SPEED
+        };
+
+        // Check movement.
+        if self.reset_countdown.is_none() {
+            if keyboard[Key::H].is_down() || keyboard[Key::Left].is_down() {
+                self.player.rect.pos.x -= movespeed;
+            } else if keyboard[Key::J].is_down() || keyboard[Key::Down].is_down() {
+                self.player.rect.pos.y += movespeed;
+            } else if keyboard[Key::K].is_down() || keyboard[Key::Up].is_down() {
+                self.player.rect.pos.y -= movespeed;
+            } else if keyboard[Key::L].is_down() || keyboard[Key::Right].is_down() {
+                self.player.rect.pos.x += movespeed;
+            }
+        }
+
+        // Put player back in movement bounds.
+        if self.player.rect.pos.x + self.player.rect.size.x > FIELD_EDGE_LENGTH {
+            self.player.rect.pos.x = FIELD_EDGE_LENGTH - self.player.rect.size.x;
+        } else if self.player.rect.pos.x < 0. {
+            self.player.rect.pos.x = 0.;
+        }
+        if self.player.rect.pos.y + self.player.rect.size.y > FIELD_EDGE_LENGTH {
+            self.player.rect.pos.y = FIELD_EDGE_LENGTH - self.player.rect.size.y;
+        } else if self.player.rect.pos.y < 0. {
+            self.player.rect.pos.y = 0.;
+        }
+
+        // Quit and shit.
+        if keyboard[Key::Escape].is_down() {
+            self.is_running = false;
+        }
+
+        Ok(())
+    }
+
     fn update_fps_graph(&mut self, window: &Window) -> Result<()> {
         self.fps_graph.log_fps(window.current_fps());
         if self.fps_update_time.is_none()
