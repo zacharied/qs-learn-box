@@ -367,102 +367,6 @@ impl GameState {
     }
 }
 
-/// Wrapper function implementations. These allow us to use `?` on functions that return an Error
-/// (and not a QuicksilverError). Then, in the implementations of the real `draw` and `update`, we
-/// check if this returned a `Err(Error::QuicksilverError)` or an `Ok()`. If it did, then the
-/// function continues as normal. Otherwise it will panic with the error's message.
-impl GameState {
-    fn wrapper(&mut self, window: &mut Window,
-                    mut wrapper: Box<dyn FnMut(&mut GameState, &mut Window) -> Result<()>>)
-        -> quicksilver::Result<()>
-    {
-        wrapper(self, window)
-            .or_else(|e| {
-                match e {
-                    Error::QuicksilverError(e) => return Err(e),
-                    _ => panic!(e.to_string()),
-                }
-            })
-    }
-
-    fn draw_wrapper(&mut self, window: &mut Window) -> Result<()> {
-        window.clear(Color::BLACK)?;
-
-        self.draw_field_border(window)?;
-        self.draw_player(window)?;
-        self.draw_obstacles(window)?;
-        self.draw_hud(window)?;
-
-        Ok(())
-    }
-
-    fn update_wrapper(&mut self, window: &mut Window) -> Result<()> {
-        if !self.is_running {
-            window.close();
-        }
-
-        self.handle_input(window.keyboard())?;
-
-        self.fps_graph.log_fps(window.current_fps());
-        if self.fps_update_time.is_none()
-            || Instant::now().duration_since(self.fps_update_time.unwrap())
-                > Duration::from_millis(200)
-        {
-            self.fps_update_time = Some(Instant::now());
-        }
-
-        if self.reset_countdown.is_none() {
-            for ob in &mut self.obstacles {
-                ob.lifetime += 1.;
-
-                // Check collisions.
-                if self.player.rect.overlaps_rectangle(&ob.rectangle()) {
-                    self.reset_countdown = Some(Countdown::new(Duration::from_secs(2)));
-                } else if self
-                    .player
-                    .collector_rectangle()
-                    .overlaps_rectangle(&ob.rectangle())
-                {
-                    self.player.score += 1;
-                }
-            }
-        }
-
-        // Spawn a new obstacle if it's time.
-        if self.last_spawned.is_none() || self.last_spawned.unwrap().elapsed() > self.spawn_interval
-        {
-            self.last_spawned = Some(Instant::now());
-            self.obstacles.push(Obstacle::spawn(&mut self.rng));
-            self.spawn_interval = Self::obstacle_spawn_interval(self.player.score);
-        }
-
-
-        if let Some(c) = &self.reset_countdown {
-            if c.is_done() {
-                println!("You lose! Score: {}", self.player.score);
-                self.obstacles.clear();
-                self.player = Player::new();
-                self.reset_countdown = None;
-            }
-        }
-
-        // Give the player points and destroy an obstacle if it's offscreen.
-        let player = &mut self.player;
-        self.obstacles.retain(|&ob| {
-            let res = ob.lifetime
-                < ob.total_lifetime()
-                    + FIELD_EDGE_LENGTH / OBSTACLE_WARNING_MOVE_SPEED
-                    + OBSTACLE_HIDE_DELAY as f32;
-            if !res {
-                player.score += 100;
-            }
-            res
-        });
-
-        Ok(())
-    }
-}
-
 impl State for GameState {
     fn new() -> quicksilver::Result<GameState> {
         Ok(GameState {
@@ -485,15 +389,98 @@ impl State for GameState {
     }
 
     fn update(&mut self, window: &mut Window) -> quicksilver::Result<()> {
-        self.wrapper(window, Box::new(|gs: &mut GameState, win: &mut Window| {
-            gs.update_wrapper(win)
-        }))
+        fn update_inner(state: &mut GameState, window: &mut Window) -> Result<()> {
+            if !state.is_running {
+                window.close();
+            }
+
+            state.handle_input(window.keyboard())?;
+
+            state.fps_graph.log_fps(window.current_fps());
+            if state.fps_update_time.is_none()
+                || Instant::now().duration_since(state.fps_update_time.unwrap())
+                > Duration::from_millis(200)
+            {
+                state.fps_update_time = Some(Instant::now());
+            }
+
+            if state.reset_countdown.is_none() {
+                for ob in &mut state.obstacles {
+                    ob.lifetime += 1.;
+
+                    // Check collisions.
+                    if state.player.rect.overlaps_rectangle(&ob.rectangle()) {
+                        state.reset_countdown = Some(Countdown::new(Duration::from_secs(2)));
+                    } else if state
+                        .player
+                        .collector_rectangle()
+                        .overlaps_rectangle(&ob.rectangle())
+                    {
+                        state.player.score += 1;
+                    }
+                }
+            }
+
+            // Spawn a new obstacle if it's time.
+            if state.last_spawned.is_none() || state.last_spawned.unwrap().elapsed() > state.spawn_interval
+            {
+                state.last_spawned = Some(Instant::now());
+                state.obstacles.push(Obstacle::spawn(&mut state.rng));
+                state.spawn_interval = GameState::obstacle_spawn_interval(state.player.score);
+            }
+
+
+            if let Some(c) = &state.reset_countdown {
+                if c.is_done() {
+                    println!("You lose! Score: {}", state.player.score);
+                    state.obstacles.clear();
+                    state.player = Player::new();
+                    state.reset_countdown = None;
+                }
+            }
+
+            // Give the player points and destroy an obstacle if it's offscreen.
+            let player = &mut state.player;
+            state.obstacles.retain(|&ob| {
+                let res = ob.lifetime
+                    < ob.total_lifetime()
+                    + FIELD_EDGE_LENGTH / OBSTACLE_WARNING_MOVE_SPEED
+                    + OBSTACLE_HIDE_DELAY as f32;
+                if !res {
+                    player.score += 100;
+                }
+                res
+            });
+
+            Ok(())
+        }
+
+        update_inner(self, window).or_else(|e| {
+            match e {
+                Error::QuicksilverError(e) => return Err(e),
+                _ => panic!(e.to_string())
+            }
+        })
     }
 
     fn draw(&mut self, window: &mut Window) -> quicksilver::Result<()> {
-        self.wrapper(window, Box::new(|gs: &mut GameState, win: &mut Window| {
-            gs.draw_wrapper(win)
-        }))
+        fn draw_inner(gs: &mut GameState, window: &mut Window) -> Result<()> {
+            window.clear(Color::BLACK)?;
+
+            gs.draw_field_border(window)?;
+            gs.draw_player(window)?;
+            gs.draw_obstacles(window)?;
+            gs.draw_hud(window)?;
+
+            Ok(())
+        }
+
+        draw_inner(self, window).or_else(|e| {
+            match e {
+                Error::QuicksilverError(e) => return Err(e),
+                _ => panic!(e.to_string())
+            }
+        })
     }
 }
 
