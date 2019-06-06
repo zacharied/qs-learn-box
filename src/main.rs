@@ -21,7 +21,9 @@ use std::{
 
 use consts::{game::*, graphics::*, system::*};
 use error::{Error, Result};
+use graphics::Strobe;
 use util::{Countdown, FpsGraph};
+use core::borrow::Borrow;
 
 #[derive(Debug)]
 enum Direction {
@@ -245,9 +247,15 @@ impl GameState {
 
         // Then draw the obstacles themselves.
         for obstacle in &self.obstacles {
+            let color = if obstacle.rectangle().overlaps_rectangle(&self.player.rect) && self.reset_countdown.is_some() {
+                let countdown = self.reset_countdown.as_ref().unwrap().elapsed();
+                Color::RED.strobe(&countdown, Duration::from_millis(500))
+            } else {
+                Color::RED
+            };
             window.draw(
                 &obstacle.rectangle().on_playfield(),
-                Background::Col(Color::RED),
+                Background::Col(color)
             );
         }
 
@@ -313,13 +321,6 @@ impl GameState {
             &self.player.rect.on_playfield(),
             Background::Col(self.player.color),
         );
-
-        if let Some(c) = &self.reset_countdown {
-            let d = c.elapsed();
-            let v = u8::max_value() as f64 * (((d.as_secs() as f64 + d.subsec_millis() as f64 / 500.) * (std::f64::consts::PI * 2.)).cos() * 0.5 + 0.5);
-            let v = u8::max_value() - v as u8;
-            self.player.color = Color::from_rgba(u8::max_value(), v, v, std::f32::MAX);
-        }
 
         Ok(())
     }
